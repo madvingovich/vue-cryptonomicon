@@ -11,6 +11,7 @@
               <input
                 v-model="ticker"
                 @keydown.enter="add"
+                @blur="clearError"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -95,7 +96,9 @@
                 CHD
               </span>
             </div>
-            <div class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div v-if="error" class="text-sm text-red-600">
+              Такой тикер уже добавлен
+            </div>
           </div>
         </div>
         <button
@@ -176,13 +179,26 @@ export default {
     return {
       ticker: 'BTC',
       tickers: [],
+      error: null,
       selected: null,
     };
   },
+  watch: {
+    ticker() {
+      this.clearError();
+    },
+  },
   methods: {
     add() {
-      this.tickers.push({ name: this.ticker, price: '-', prices: [] });
-      this.ticker = '';
+      if (this.tickers.findIndex((t) => t.name === this.ticker) !== -1) {
+        this.error = 'Такой тикер уже добавлен';
+      } else {
+        this.tickers.push({ name: this.ticker, price: '-', prices: [] });
+        this.ticker = '';
+      }
+    },
+    clearError() {
+      this.error = null;
     },
     onSelect(t) {
       this.selected = t;
