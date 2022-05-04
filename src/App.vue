@@ -1,5 +1,42 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
+    <div
+      v-if="coinlistLoading"
+      class="
+        fixed
+        w-100
+        h-100
+        opacity-80
+        bg-purple-800
+        inset-0
+        z-50
+        flex
+        items-center
+        justify-center
+      "
+    >
+      <svg
+        class="animate-spin -ml-1 mr-3 h-12 w-12 text-white"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          class="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          stroke-width="4"
+        ></circle>
+        <path
+          class="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        ></path>
+      </svg>
+    </div>
+
     <div class="container">
       <section>
         <div class="flex">
@@ -28,74 +65,12 @@
                 placeholder="Например DOGE"
               />
             </div>
-            <div
-              class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
-            >
-              <span
-                class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                BTC
-              </span>
-              <span
-                class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                DOGE
-              </span>
-              <span
-                class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                BCH
-              </span>
-              <span
-                class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                CHD
-              </span>
-            </div>
+            <CoinSuggestions
+              v-if="coinlist && ticker.length"
+              :coinlist="coinlist"
+              :searchValue="ticker"
+              @select="onSuggestionClick"
+            />
             <div v-if="error" class="text-sm text-red-600">
               Такой тикер уже добавлен
             </div>
@@ -172,16 +147,31 @@
 <script>
 import AppTicker from './AppTicker.vue';
 import PriceBars from './PriceBars.vue';
+import CoinSuggestions from './CoinSuggestions.vue';
+import { nextTick } from '@vue/runtime-core';
 export default {
   name: 'App',
   apiKey: '409dea7172697de942cd44745d23de93c799cec7d10538e3dc1501b8ad32e954',
   data() {
     return {
       ticker: 'BTC',
+      coinlist: [],
+      coinlistLoading: false,
       tickers: [],
       error: null,
       selected: null,
     };
+  },
+  mounted() {
+    this.coinlistLoading = true;
+    fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true')
+      .then((data) => data.json())
+      .then((res) => {
+        this.coinlist = Object.values(res.Data);
+      })
+      .finally(() => {
+        this.coinlistLoading = false;
+      });
   },
   watch: {
     ticker() {
@@ -190,8 +180,14 @@ export default {
   },
   methods: {
     add() {
-      if (this.tickers.findIndex((t) => t.name === this.ticker) !== -1) {
-        this.error = 'Такой тикер уже добавлен';
+      if (
+        this.tickers.findIndex(
+          (t) => t.name.toLowerCase() === this.ticker.toLowerCase()
+        ) !== -1
+      ) {
+        nextTick(() => {
+          this.error = 'Такой тикер уже добавлен';
+        });
       } else {
         this.tickers.push({ name: this.ticker, price: '-', prices: [] });
         this.ticker = '';
@@ -199,6 +195,10 @@ export default {
     },
     clearError() {
       this.error = null;
+    },
+    onSuggestionClick(ticker) {
+      this.ticker = ticker;
+      this.add();
     },
     onSelect(t) {
       this.selected = t;
@@ -222,6 +222,7 @@ export default {
   components: {
     AppTicker,
     PriceBars,
+    CoinSuggestions,
   },
 };
 </script>
