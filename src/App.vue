@@ -116,13 +116,58 @@
           </svg>
           Добавить
         </button>
+        <div class="flex items-center">
+          <span>Фильтр:</span>
+          <input
+            type="text"
+            v-model="filter"
+            class="
+              mx-2
+              border-gray-300
+              text-gray-900
+              focus:outline-none focus:ring-gray-500 focus:border-gray-500
+              sm:text-sm
+              rounded-md
+            "
+          />
+          <hr />
+          <span class="mr-4">Страница:</span>
+          <span
+            v-if="page > 1"
+            @click="this.page--"
+            class="
+              cursor-pointer
+              p-1
+              bg-white
+              rounded-md
+              border-red-300 border-2
+            "
+            >&lt;</span
+          >
+
+          <span class="p-1 bg-white rounded-md mx-1 border-red-300 border-2">{{
+            page
+          }}</span>
+          <span
+            v-if="isNextPageAvailable"
+            @click="this.page++"
+            class="
+              cursor-pointer
+              p-1
+              bg-white
+              rounded-md
+              border-red-300 border-2
+            "
+            >&gt;</span
+          >
+        </div>
       </section>
 
-      <template v-if="tickers.length">
+      <template v-if="paginatedTickers.length">
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <AppTicker
-            v-for="t in tickers"
+            v-for="t in paginatedTickers"
             :key="t.name"
             :price="t.price"
             :name="t.name"
@@ -155,6 +200,8 @@ export default {
   data() {
     return {
       ticker: 'BTC',
+      filter: '',
+      page: 1,
       coinlist: [],
       coinlistLoading: false,
       tickers: [],
@@ -163,22 +210,49 @@ export default {
     };
   },
   mounted() {
-    this.coinlistLoading = true;
-    fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true')
-      .then((data) => data.json())
-      .then((res) => {
-        this.coinlist = Object.values(res.Data);
-      })
-      .finally(() => {
-        this.coinlistLoading = false;
-      });
+    this.loadCoinlist();
+    this.getSavedTickets();
+    this.parseUrl();
+  },
+  computed: {
+    filteredTickers() {
+      return this.tickers.filter((t) =>
+        t.name.toLowerCase().includes(this.filter)
+      );
+    },
+    paginatedTickers() {
+      const start = (this.page - 1) * 3;
+      const end = this.page * 3;
+      return this.filteredTickers.slice(start, end);
+    },
+    isNextPageAvailable() {
+      return this.filteredTickers.length > this.page * 3;
+    },
   },
   watch: {
     ticker() {
       this.clearError();
     },
+    filter() {
+      this.page = 1;
+      this.saveUrlData();
+    },
+    page() {
+      this.saveUrlData();
+    },
   },
   methods: {
+    loadCoinlist() {
+      this.coinlistLoading = true;
+      fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true')
+        .then((data) => data.json())
+        .then((res) => {
+          this.coinlist = Object.values(res.Data);
+        })
+        .finally(() => {
+          this.coinlistLoading = false;
+        });
+    },
     add() {
       if (
         this.tickers.findIndex(
@@ -191,6 +265,7 @@ export default {
       } else {
         this.tickers.push({ name: this.ticker, price: '-', prices: [] });
         this.ticker = '';
+        localStorage.setItem('tickers', JSON.stringify(this.tickers));
       }
     },
     clearError() {
@@ -217,6 +292,32 @@ export default {
         }
         return t;
       });
+    },
+    saveUrlData() {
+      const url = new URL(window.location.href);
+      url.searchParams.set('page', this.page);
+      url.searchParams.set('filter', this.filter);
+      window.history.pushState(null, document.title, url.href);
+    },
+    parseUrl() {
+      const urlParams = Object.fromEntries(
+        new URL(window.location.href).searchParams.entries()
+      );
+      if (urlParams.filter) {
+        this.filter = urlParams.filter;
+      }
+      if (urlParams.page) {
+        this.page = urlParams.page;
+      }
+    },
+    getSavedTickets() {
+      const savedTickers = localStorage.getItem('tickers');
+      if (savedTickers) {
+        this.tickers = JSON.parse(savedTickers).map((t) => {
+          t.prices = [];
+          return t;
+        });
+      }
     },
   },
   components: {
