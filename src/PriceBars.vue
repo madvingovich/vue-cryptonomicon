@@ -46,10 +46,11 @@ export default {
   props: ['title', 'prices'],
   emits: ['close'],
   methods: {
-    getPriceHeight(price) {
-      const min = Math.min(...this.prices);
-      const max = Math.max(...this.prices);
-      return (5 + (price - min) * 95) / (max - min);
+    getPriceHeight() {
+      // const min = Math.min(...this.prices);
+      // const max = Math.max(...this.prices);
+      // return (5 + (price - min) * 95) / (max - min);
+      return 50;
     },
   },
 };

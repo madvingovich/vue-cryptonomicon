@@ -47,7 +47,7 @@
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 v-model="ticker"
-                @keydown.enter="add"
+                @keydown.enter="addTicker"
                 @blur="clearError"
                 type="text"
                 name="wallet"
@@ -77,7 +77,7 @@
           </div>
         </div>
         <button
-          @click="add"
+          @click="addTicker"
           type="button"
           class="
             my-4
@@ -169,7 +169,7 @@
           <AppTicker
             v-for="t in paginatedTickers"
             :key="t.name"
-            :price="t.price"
+            :price="formatPrice(t.price)"
             :name="t.name"
             :selected="t === this.selected"
             @delete="onDelete(t)"
@@ -181,7 +181,7 @@
       <PriceBars
         v-if="selected"
         :title="`${selected.name} - USD`"
-        :prices="selected.prices"
+        :prices="selected.priceHistory.map(formatPrice)"
         @close="selected = null"
       />
     </div>
@@ -193,7 +193,10 @@ import AppTicker from './AppTicker.vue';
 import PriceBars from './PriceBars.vue';
 import CoinSuggestions from './CoinSuggestions.vue';
 import { nextTick } from '@vue/runtime-core';
-import { loadTickersPrices, loadCoinlist } from './api';
+import { loadCoinlist, subscribeToTicker, unsubscribeFromTicker } from './api';
+
+const ITEMS_PER_PAGE = 6;
+
 export default {
   name: 'App',
   apiKey: '409dea7172697de942cd44745d23de93c799cec7d10538e3dc1501b8ad32e954',
@@ -221,23 +224,22 @@ export default {
     this.parseUrl();
   },
   unmounted() {
-    clearInterval(this.interval);
+    this.tickers.forEach((t) => {
+      unsubscribeFromTicker(t.name);
+    });
   },
   methods: {
-    add() {
-      if (
-        this.tickers.findIndex(
-          (t) => t.name.toLowerCase() === this.ticker.toLowerCase()
-        ) !== -1
-      ) {
+    addTicker() {
+      if (this.tickerAlreadyAdded) {
         nextTick(() => {
           this.error = 'Такой тикер уже добавлен';
         });
       } else {
-        this.tickers = [
-          ...this.tickers,
-          { name: this.ticker.toUpperCase(), price: '-', prices: [] },
-        ];
+        const newTicker = { name: this.ticker.toUpperCase(), price: '-' };
+        this.tickers = [...this.tickers, newTicker];
+        subscribeToTicker(newTicker.name, (price) =>
+          this.updateTickerPrice(newTicker.name, price)
+        );
         this.ticker = '';
       }
     },
@@ -251,23 +253,16 @@ export default {
           this.coinlistLoading = false;
         });
     },
-    getTickersPrices() {
-      loadTickersPrices(this.tickers.map((t) => t.name)).then(
-        this.updateTickersPrices
-      );
-    },
-    updateTickersPrices(prices) {
-      this.tickers.forEach((ticker) => {
-        const price = prices[ticker.name];
-        ticker.price = price ? (1 / price).toFixed(5) : '-';
-      });
+    updateTickerPrice(name, price) {
+      const tickerIndex = this.tickers.findIndex((t) => t.name === name);
+      this.tickers[tickerIndex].price = price;
     },
     clearError() {
       this.error = null;
     },
     onSuggestionClick(ticker) {
       this.ticker = ticker;
-      this.add();
+      this.addTicker();
     },
     onSelect(t) {
       this.selected = t;
@@ -277,6 +272,7 @@ export default {
       if (tickerToRemove === this.selected) {
         this.selected = null;
       }
+      unsubscribeFromTicker(tickerToRemove.name);
     },
     parseUrl() {
       const urlParams = Object.fromEntries(
@@ -293,19 +289,36 @@ export default {
       const savedTickers = localStorage.getItem('tickers');
       if (savedTickers) {
         this.tickers = JSON.parse(savedTickers).map((t) => {
-          t.prices = [];
+          t.priceHistory = [];
           t.price = '-';
+          subscribeToTicker(t.name, (price) =>
+            this.updateTickerPrice(t.name, price)
+          );
           return t;
         });
       }
     },
+    formatPrice(price) {
+      if (!price || typeof price !== 'number') {
+        return '-';
+      }
+      return price > 1 ? price.toFixed(3) : price.toPrecision(3);
+    },
   },
   computed: {
     startIndex() {
-      return (this.page - 1) * 3;
+      return (this.page - 1) * ITEMS_PER_PAGE;
     },
     endIndex() {
-      return this.page * 3;
+      return this.page * ITEMS_PER_PAGE;
+    },
+    tickerAlreadyAdded() {
+      return (
+        this.ticker.length &&
+        this.tickers.findIndex(
+          (t) => t.name.toLowerCase() === this.ticker.toLowerCase()
+        ) !== -1
+      );
     },
     filteredTickers() {
       return this.tickers.filter((t) =>
@@ -326,15 +339,8 @@ export default {
     ticker() {
       this.clearError();
     },
-    tickers(currentTickers, prevTickers) {
+    tickers() {
       localStorage.setItem('tickers', JSON.stringify(this.tickers));
-      if (
-        currentTickers.length &&
-        currentTickers.length !== prevTickers.length
-      ) {
-        clearInterval(this.interval);
-        this.interval = setInterval(this.getTickersPrices, 3000);
-      }
     },
     paginatedTickers() {
       if (this.paginatedTickers.length === 0 && this.page > 1) {
