@@ -193,6 +193,7 @@ import AppTicker from './AppTicker.vue';
 import PriceBars from './PriceBars.vue';
 import CoinSuggestions from './CoinSuggestions.vue';
 import { nextTick } from '@vue/runtime-core';
+import { loadTickersPrices, loadCoinlist } from './api';
 export default {
   name: 'App',
   apiKey: '409dea7172697de942cd44745d23de93c799cec7d10538e3dc1501b8ad32e954',
@@ -223,25 +224,6 @@ export default {
     clearInterval(this.interval);
   },
   methods: {
-    loadCoinlist() {
-      this.coinlistLoading = true;
-      fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true')
-        .then((data) => data.json())
-        .then((res) => {
-          this.coinlist = Object.values(res.Data);
-        })
-        .finally(() => {
-          this.coinlistLoading = false;
-        });
-    },
-    getTickersPrices() {
-      const tickerNames = this.tickers.map((t) => t.name).join(',');
-      fetch(
-        `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${tickerNames}&tsyms=USD`
-      )
-        .then((d) => d.json())
-        .then(this.updateTickersPrices);
-    },
     add() {
       if (
         this.tickers.findIndex(
@@ -254,17 +236,30 @@ export default {
       } else {
         this.tickers = [
           ...this.tickers,
-          { name: this.ticker, price: '-', prices: [] },
+          { name: this.ticker.toUpperCase(), price: '-', prices: [] },
         ];
         this.ticker = '';
       }
     },
+    loadCoinlist() {
+      this.coinlistLoading = true;
+      loadCoinlist()
+        .then((res) => {
+          this.coinlist = Object.values(res.Data);
+        })
+        .finally(() => {
+          this.coinlistLoading = false;
+        });
+    },
+    getTickersPrices() {
+      loadTickersPrices(this.tickers.map((t) => t.name)).then(
+        this.updateTickersPrices
+      );
+    },
     updateTickersPrices(prices) {
-      this.tickers = this.tickers.map((t) => {
-        if (prices[t.name]) {
-          t.price = prices[t.name]['USD'];
-        }
-        return t;
+      this.tickers.forEach((ticker) => {
+        const price = prices[ticker.name];
+        ticker.price = price ? (1 / price).toFixed(5) : '-';
       });
     },
     clearError() {
@@ -299,6 +294,7 @@ export default {
       if (savedTickers) {
         this.tickers = JSON.parse(savedTickers).map((t) => {
           t.prices = [];
+          t.price = '-';
           return t;
         });
       }
