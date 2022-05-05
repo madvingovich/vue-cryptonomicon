@@ -59,32 +59,6 @@
 export default {
   name: 'AppTicker',
   props: ['name', 'price', 'selected'],
-  emits: ['delete', 'select', 'priceUpdate'],
-  data() {
-    return {
-      interval: null,
-    };
-  },
-  methods: {
-    async getTickerPrice() {
-      return fetch(
-        `https://min-api.cryptocompare.com/data/price?fsym=${this.name}&tsyms=USD`
-      )
-        .then((r) => r.json())
-        .then((res) => res.USD);
-    },
-    updateTickerPrice() {
-      this.getTickerPrice().then((price) => {
-        this.$emit('priceUpdate', price);
-      });
-    },
-  },
-  mounted() {
-    this.updateTickerPrice();
-    this.interval = setInterval(this.updateTickerPrice, 3000);
-  },
-  unmounted() {
-    clearInterval(this.interval);
-  },
+  emits: ['delete', 'select'],
 };
 </script>

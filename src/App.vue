@@ -174,7 +174,6 @@
             :selected="t === this.selected"
             @delete="onDelete(t)"
             @select="onSelect(t)"
-            @priceUpdate="(price) => onPriceUpdate(t, price)"
           />
         </dl>
       </template>
@@ -207,39 +206,21 @@ export default {
       tickers: [],
       error: null,
       selected: null,
+      interval: null,
     };
+  },
+  components: {
+    AppTicker,
+    PriceBars,
+    CoinSuggestions,
   },
   mounted() {
     this.loadCoinlist();
     this.getSavedTickets();
     this.parseUrl();
   },
-  computed: {
-    filteredTickers() {
-      return this.tickers.filter((t) =>
-        t.name.toLowerCase().includes(this.filter)
-      );
-    },
-    paginatedTickers() {
-      const start = (this.page - 1) * 3;
-      const end = this.page * 3;
-      return this.filteredTickers.slice(start, end);
-    },
-    isNextPageAvailable() {
-      return this.filteredTickers.length > this.page * 3;
-    },
-  },
-  watch: {
-    ticker() {
-      this.clearError();
-    },
-    filter() {
-      this.page = 1;
-      this.saveUrlData();
-    },
-    page() {
-      this.saveUrlData();
-    },
+  unmounted() {
+    clearInterval(this.interval);
   },
   methods: {
     loadCoinlist() {
@@ -253,6 +234,14 @@ export default {
           this.coinlistLoading = false;
         });
     },
+    getTickersPrices() {
+      const tickerNames = this.tickers.map((t) => t.name).join(',');
+      fetch(
+        `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${tickerNames}&tsyms=USD`
+      )
+        .then((d) => d.json())
+        .then(this.updateTickersPrices);
+    },
     add() {
       if (
         this.tickers.findIndex(
@@ -263,10 +252,20 @@ export default {
           this.error = 'Такой тикер уже добавлен';
         });
       } else {
-        this.tickers.push({ name: this.ticker, price: '-', prices: [] });
+        this.tickers = [
+          ...this.tickers,
+          { name: this.ticker, price: '-', prices: [] },
+        ];
         this.ticker = '';
-        localStorage.setItem('tickers', JSON.stringify(this.tickers));
       }
+    },
+    updateTickersPrices(prices) {
+      this.tickers = this.tickers.map((t) => {
+        if (prices[t.name]) {
+          t.price = prices[t.name]['USD'];
+        }
+        return t;
+      });
     },
     clearError() {
       this.error = null;
@@ -283,21 +282,6 @@ export default {
       if (tickerToRemove === this.selected) {
         this.selected = null;
       }
-    },
-    onPriceUpdate(ticker, price) {
-      this.tickers = this.tickers.map((t) => {
-        if (t === ticker) {
-          t.price = price;
-          t.prices.push(price);
-        }
-        return t;
-      });
-    },
-    saveUrlData() {
-      const url = new URL(window.location.href);
-      url.searchParams.set('page', this.page);
-      url.searchParams.set('filter', this.filter);
-      window.history.pushState(null, document.title, url.href);
     },
     parseUrl() {
       const urlParams = Object.fromEntries(
@@ -320,10 +304,56 @@ export default {
       }
     },
   },
-  components: {
-    AppTicker,
-    PriceBars,
-    CoinSuggestions,
+  computed: {
+    startIndex() {
+      return (this.page - 1) * 3;
+    },
+    endIndex() {
+      return this.page * 3;
+    },
+    filteredTickers() {
+      return this.tickers.filter((t) =>
+        t.name.toLowerCase().includes(this.filter)
+      );
+    },
+    paginatedTickers() {
+      return this.filteredTickers.slice(this.startIndex, this.endIndex);
+    },
+    isNextPageAvailable() {
+      return this.filteredTickers.length > this.endIndex;
+    },
+    pageState() {
+      return { filter: this.filter, page: this.page };
+    },
+  },
+  watch: {
+    ticker() {
+      this.clearError();
+    },
+    tickers(currentTickers, prevTickers) {
+      localStorage.setItem('tickers', JSON.stringify(this.tickers));
+      if (
+        currentTickers.length &&
+        currentTickers.length !== prevTickers.length
+      ) {
+        clearInterval(this.interval);
+        this.interval = setInterval(this.getTickersPrices, 3000);
+      }
+    },
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 1) {
+        this.page -= 1;
+      }
+    },
+    filter() {
+      this.page = 1;
+    },
+    pageState({ filter, page }) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('filter', filter);
+      url.searchParams.set('page', page);
+      window.history.pushState(null, document.title, url.href);
+    },
   },
 };
 </script>
