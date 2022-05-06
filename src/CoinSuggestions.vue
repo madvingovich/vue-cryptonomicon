@@ -22,9 +22,19 @@
   </div>
 </template>
 <script>
+import { loadCoinlist } from './api';
 export default {
   name: 'CoinSuggestions',
-  props: ['coinlist', 'searchValue'],
+  props: ['searchValue'],
+  emits: ['loaded'],
+  data() {
+    return {
+      coinlist: [],
+    };
+  },
+  created() {
+    this.getCoinlist();
+  },
   computed: {
     suggestions() {
       return this.coinlist
@@ -41,6 +51,14 @@ export default {
         )
         .map(({ Symbol }) => Symbol)
         .slice(0, 4);
+    },
+  },
+  methods: {
+    getCoinlist() {
+      loadCoinlist().then((res) => {
+        this.coinlist = Object.values(res.Data);
+        this.$emit('loaded');
+      });
     },
   },
 };

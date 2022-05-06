@@ -66,10 +66,9 @@
               />
             </div>
             <CoinSuggestions
-              v-if="coinlist && ticker.length"
-              :coinlist="coinlist"
               :searchValue="ticker"
               @select="onSuggestionClick"
+              @loaded="coinlistLoading = false"
             />
             <div v-if="error" class="text-sm text-red-600">
               Такой тикер уже добавлен
@@ -195,7 +194,6 @@ import PriceBars from './PriceBars.vue';
 import CoinSuggestions from './CoinSuggestions.vue';
 import { nextTick } from '@vue/runtime-core';
 import {
-  loadCoinlist,
   subscribeToTicker,
   unsubscribeFromTicker,
   PRICE_UPDATE,
@@ -215,8 +213,7 @@ export default {
       ticker: 'BTC',
       filter: '',
       page: 1,
-      coinlist: [],
-      coinlistLoading: false,
+      coinlistLoading: true,
       tickers: [],
       error: null,
       selected: null,
@@ -229,7 +226,6 @@ export default {
     CoinSuggestions,
   },
   mounted() {
-    this.loadCoinlist();
     this.getSavedTickets();
     this.parseUrl();
   },
@@ -258,16 +254,6 @@ export default {
     getTickerByName(name) {
       const index = this.tickers.findIndex((t) => t.name === name);
       return this.tickers[index];
-    },
-    loadCoinlist() {
-      this.coinlistLoading = true;
-      loadCoinlist()
-        .then((res) => {
-          this.coinlist = Object.values(res.Data);
-        })
-        .finally(() => {
-          this.coinlistLoading = false;
-        });
     },
     updateTickerPrice(name, price) {
       this.getTickerByName(name).price = price;
