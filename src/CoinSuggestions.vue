@@ -29,7 +29,7 @@ import { loadCoinlist } from './coinlistApi';
 export default {
   name: 'CoinSuggestions',
   props: ['searchValue'],
-  emits: ['loaded'],
+  emits: ['loaded', 'select'],
   data() {
     return {
       coinlist: [],
