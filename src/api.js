@@ -1,33 +1,42 @@
+const API_KEY =
+  '409dea7172697de942cd44745d23de93c799cec7d10538e3dc1501b8ad32e954';
+
+const PRICE_UPDATE_TYPE = '5';
+
 const get = (url) => fetch(url).then((d) => d.json());
 
 export const loadCoinlist = () =>
   get('https://min-api.cryptocompare.com/data/all/coinlist?summary=true');
 
-export const loadTickersPrices = (tickers) =>
-  get(
-    `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${tickers.join(
-      ','
-    )}&tsyms=USD`
-  ).then((exchangeData) =>
-    Object.fromEntries(
-      Object.entries(exchangeData).map(([key, value]) => [key, value.USD])
-    )
-  );
+const socket = new WebSocket(
+  `wss://streamer.cryptocompare.com/v2?api_key=${API_KEY}`
+);
 
-const tickers = new Map();
-
-const loadPrices = () => {
-  const names = Array.from(tickers.keys());
-  if (names.length) {
-    loadTickersPrices(names).then((prices) => {
-      Object.entries(prices).forEach(([key, value]) => {
-        tickers.get(key).forEach((fn) => fn(value));
-      });
-    });
+socket.onmessage = (e) => {
+  const { TYPE: type, FROMSYMBOL: ticker, PRICE: price } = JSON.parse(e.data);
+  if (type === PRICE_UPDATE_TYPE && price) {
+    const subscribers = Array.from(tickers.get(ticker) ?? []);
+    subscribers.forEach((fn) => fn(price));
   }
 };
 
-setInterval(loadPrices, 5000);
+const sentToWs = (message) => {
+  const stringifiedMessage = JSON.stringify(message);
+
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(stringifiedMessage);
+  } else {
+    socket.addEventListener(
+      'open',
+      () => socket.send(JSON.stringify(message)),
+      {
+        once: true,
+      }
+    );
+  }
+};
+
+const tickers = new Map();
 
 export const subscribeToTicker = (name, cb) => {
   if (tickers.has(name)) {
@@ -35,8 +44,16 @@ export const subscribeToTicker = (name, cb) => {
   } else {
     tickers.set(name, [cb]);
   }
+  sentToWs({
+    action: 'SubAdd',
+    subs: [`5~CCCAGG~${name}~USD`],
+  });
 };
 
 export const unsubscribeFromTicker = (name) => {
   tickers.delete(name);
+  sentToWs({
+    action: 'SubRemove',
+    subs: [`5~CCCAGG~${name}~USD`],
+  });
 };

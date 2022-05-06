@@ -199,7 +199,6 @@ const ITEMS_PER_PAGE = 6;
 
 export default {
   name: 'App',
-  apiKey: '409dea7172697de942cd44745d23de93c799cec7d10538e3dc1501b8ad32e954',
   data() {
     return {
       ticker: 'BTC',
