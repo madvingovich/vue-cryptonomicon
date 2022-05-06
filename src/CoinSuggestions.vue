@@ -1,5 +1,8 @@
 <template>
-  <div class="flex bg-white p-1 rounded-md shadow-md flex-wrap">
+  <div
+    v-if="searchValue.length"
+    class="flex bg-white p-1 rounded-md shadow-md flex-wrap"
+  >
     <span
       v-for="suggestion in suggestions"
       :key="suggestion"
