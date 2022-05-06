@@ -2,7 +2,6 @@
   <div
     @click="$emit('select')"
     class="
-      bg-white
       overflow-hidden
       shadow
       rounded-lg
@@ -11,6 +10,8 @@
     "
     :class="{
       'border-4': selected,
+      'bg-red-100': error,
+      'bg-white': !error,
     }"
   >
     <div class="px-4 py-5 sm:p-6 text-center">
@@ -58,7 +59,7 @@
 <script>
 export default {
   name: 'AppTicker',
-  props: ['name', 'price', 'selected'],
+  props: ['name', 'price', 'error', 'selected'],
   emits: ['delete', 'select'],
 };
 </script>

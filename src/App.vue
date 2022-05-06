@@ -171,6 +171,7 @@
             :key="t.name"
             :price="formatPrice(t.price)"
             :name="t.name"
+            :error="t.error"
             :selected="t === this.selected"
             @delete="onDelete(t)"
             @select="onSelect(t)"
@@ -181,7 +182,7 @@
       <PriceBars
         v-if="selected"
         :title="`${selected.name} - USD`"
-        :prices="selected.priceHistory.map(formatPrice)"
+        :prices="[]"
         @close="selected = null"
       />
     </div>
@@ -193,9 +194,19 @@ import AppTicker from './AppTicker.vue';
 import PriceBars from './PriceBars.vue';
 import CoinSuggestions from './CoinSuggestions.vue';
 import { nextTick } from '@vue/runtime-core';
-import { loadCoinlist, subscribeToTicker, unsubscribeFromTicker } from './api';
+import {
+  loadCoinlist,
+  subscribeToTicker,
+  unsubscribeFromTicker,
+  PRICE_UPDATE,
+  PRICE_ERROR,
+} from './api';
+import { createStorageService } from './storageService';
+import { urlService } from './urlService';
 
 const ITEMS_PER_PAGE = 6;
+
+const tickersStorage = createStorageService('tickers');
 
 export default {
   name: 'App',
@@ -234,13 +245,19 @@ export default {
           this.error = 'Такой тикер уже добавлен';
         });
       } else {
-        const newTicker = { name: this.ticker.toUpperCase(), price: '-' };
+        const newTicker = {
+          name: this.ticker.toUpperCase(),
+          price: '-',
+          error: false,
+        };
         this.tickers = [...this.tickers, newTicker];
-        subscribeToTicker(newTicker.name, (price) =>
-          this.updateTickerPrice(newTicker.name, price)
-        );
+        this.subscribeToTickerUpdates(newTicker.name);
         this.ticker = '';
       }
+    },
+    getTickerByName(name) {
+      const index = this.tickers.findIndex((t) => t.name === name);
+      return this.tickers[index];
     },
     loadCoinlist() {
       this.coinlistLoading = true;
@@ -253,8 +270,10 @@ export default {
         });
     },
     updateTickerPrice(name, price) {
-      const tickerIndex = this.tickers.findIndex((t) => t.name === name);
-      this.tickers[tickerIndex].price = price;
+      this.getTickerByName(name).price = price;
+    },
+    setTickerError(name, error) {
+      this.getTickerByName(name).error = error;
     },
     clearError() {
       this.error = null;
@@ -274,28 +293,26 @@ export default {
       unsubscribeFromTicker(tickerToRemove.name);
     },
     parseUrl() {
-      const urlParams = Object.fromEntries(
-        new URL(window.location.href).searchParams.entries()
-      );
-      if (urlParams.filter) {
-        this.filter = urlParams.filter;
-      }
-      if (urlParams.page) {
-        this.page = urlParams.page;
-      }
+      Object.assign(this, urlService.getSearchParams(['filter', 'page']));
     },
     getSavedTickets() {
-      const savedTickers = localStorage.getItem('tickers');
+      const savedTickers = tickersStorage.get();
       if (savedTickers) {
-        this.tickers = JSON.parse(savedTickers).map((t) => {
-          t.priceHistory = [];
+        this.tickers = savedTickers.map((t) => {
           t.price = '-';
-          subscribeToTicker(t.name, (price) =>
-            this.updateTickerPrice(t.name, price)
-          );
+          this.subscribeToTickerUpdates(t.name);
           return t;
         });
       }
+    },
+    subscribeToTickerUpdates(name) {
+      subscribeToTicker(name, ({ type, value }) => {
+        if (type === PRICE_UPDATE) {
+          this.updateTickerPrice(name, value);
+        } else if (type === PRICE_ERROR) {
+          this.setTickerError(name, true);
+        }
+      });
     },
     formatPrice(price) {
       if (!price || typeof price !== 'number') {
@@ -339,7 +356,7 @@ export default {
       this.clearError();
     },
     tickers() {
-      localStorage.setItem('tickers', JSON.stringify(this.tickers));
+      tickersStorage.set(this.tickers);
     },
     paginatedTickers() {
       if (this.paginatedTickers.length === 0 && this.page > 1) {
@@ -349,11 +366,8 @@ export default {
     filter() {
       this.page = 1;
     },
-    pageState({ filter, page }) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('filter', filter);
-      url.searchParams.set('page', page);
-      window.history.pushState(null, document.title, url.href);
+    pageState(pageState) {
+      urlService.setSearchParams(pageState);
     },
   },
 };
