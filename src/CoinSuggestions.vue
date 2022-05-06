@@ -22,7 +22,7 @@
   </div>
 </template>
 <script>
-import { loadCoinlist } from './api';
+import { loadCoinlist } from './coinlistApi';
 export default {
   name: 'CoinSuggestions',
   props: ['searchValue'],
