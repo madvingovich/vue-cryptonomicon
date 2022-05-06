@@ -5,10 +5,37 @@ const PRICE_UPDATE_TYPE = '5';
 const INVALID_SUB = 'INVALID_SUB';
 const BTC = 'BTC';
 
-export const PRICE_UPDATE = 'price_update';
-export const PRICE_ERROR = 'price_error';
+export const PRICE_UPDATE = 'PRICE_UPDATE';
+export const PRICE_ERROR = 'PRICE_ERROR';
+
+export const subscribeToTicker = (name, cb) => {
+  if (cb) {
+    if (tickers.has(name)) {
+      tickers.set(name, [...tickers.get(name), cb]);
+    } else {
+      tickers.set(name, [cb]);
+    }
+  }
+  if (name === BTC) {
+    isSubscribedToBtcUds = true;
+  }
+  addSubscription(name);
+};
+
+export const unsubscribeFromTicker = (name) => {
+  tickers.delete(name);
+  if (name === BTC && isSubscribedToBtcUds && btcSubs.length) {
+    return;
+  }
+  if (btcSubs.includes(name)) {
+    removeTickerToBtcSubscription(name);
+  } else {
+    removeSubscription(name);
+  }
+};
 
 const tickers = new Map();
+
 let btcSubs = [];
 let lastBtcPrice = null;
 let isSubscribedToBtcUds = false;
@@ -35,6 +62,7 @@ socket.onmessage = (e) => {
     TOSYMBOL: toTicker,
     PRICE: price,
   } = JSON.parse(e.data);
+
   if (message === INVALID_SUB) {
     const tickerName = getTickerFromParameter(parameter);
     if (hasBtcPairSubscription(tickerName)) {
@@ -45,14 +73,14 @@ socket.onmessage = (e) => {
   }
   if (type === PRICE_UPDATE_TYPE && price) {
     if (toTicker === BTC) {
-      if (isSubscribedToBtcUds) {
-        lastBtcPrice &&
-          reportSubscribers(ticker, {
-            type: PRICE_UPDATE,
-            value: price * lastBtcPrice,
-          });
-      } else {
+      if (!isSubscribedToBtcUds) {
         subscribeToTicker(BTC);
+      }
+      if (isSubscribedToBtcUds && lastBtcPrice) {
+        reportSubscribers(ticker, {
+          type: PRICE_UPDATE,
+          value: price * lastBtcPrice,
+        });
       }
     } else {
       if (ticker === BTC) {
@@ -63,7 +91,7 @@ socket.onmessage = (e) => {
   }
 };
 
-const sentToWs = (message) => {
+const sendToSocket = (message) => {
   const stringifiedMessage = JSON.stringify(message);
 
   if (socket.readyState === WebSocket.OPEN) {
@@ -79,52 +107,37 @@ const sentToWs = (message) => {
   }
 };
 
-export const subscribeToTicker = (name, cb) => {
-  if (cb) {
-    if (tickers.has(name)) {
-      tickers.set(name, [...tickers.get(name), cb]);
-    } else {
-      tickers.set(name, [cb]);
-    }
-  }
-  if (name === BTC) {
-    isSubscribedToBtcUds = true;
-  }
-  sentToWs({
-    action: 'SubAdd',
-    subs: [`5~CCCAGG~${name}~USD`],
-  });
-};
+const createActionObject = (action, fromPair, toPair) => ({
+  action,
+  subs: [`5~CCCAGG~${fromPair}~${toPair}`],
+});
 
-export const unsubscribeFromTicker = (name) => {
-  tickers.delete(name);
-  if (name === BTC && isSubscribedToBtcUds && btcSubs.length) {
-    return;
-  }
-  if (btcSubs.includes(name)) {
-    btcSubs = btcSubs.filter((s) => s !== name);
-    sentToWs({
-      action: 'SubRemove',
-      subs: [`5~CCCAGG~${name}~BTC`],
-    });
-    if (!tickers.get(BTC) && !btcSubs.length) {
-      sentToWs({
-        action: 'SubRemove',
-        subs: [`5~CCCAGG~${BTC}~USD`],
-      });
-      lastBtcPrice = null;
-    }
-  }
-  sentToWs({
-    action: 'SubRemove',
-    subs: [`5~CCCAGG~${name}~USD`],
-  });
-};
+const createSubscriptionObject = (fromPair, toPair) =>
+  createActionObject('SubAdd', fromPair, toPair);
+
+const createUnsubscriptionObject = (fromPair, toPair) =>
+  createActionObject('SubRemove', fromPair, toPair);
+
+const addSubscription = (fromPair, toPair = 'USD') =>
+  sendToSocket(createSubscriptionObject(fromPair, toPair));
+
+const removeSubscription = (fromPair, toPair = 'USD') =>
+  sendToSocket(createUnsubscriptionObject(fromPair, toPair));
 
 const subscribeToBtcPair = (name) => {
-  sentToWs({
-    action: 'SubAdd',
-    subs: [`5~CCCAGG~${name}~BTC`],
-  });
+  addSubscription(name, BTC);
   btcSubs.push(name);
+};
+
+const unsubscribeFromBtcPair = (name) => {
+  removeSubscription(name, BTC);
+  btcSubs = btcSubs.filter((s) => s !== name);
+};
+
+const removeTickerToBtcSubscription = (name) => {
+  unsubscribeFromBtcPair(name);
+  if (!tickers.get(BTC) && !btcSubs.length) {
+    removeSubscription(BTC);
+    lastBtcPrice = null;
+  }
 };
