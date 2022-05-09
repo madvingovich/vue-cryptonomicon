@@ -25,7 +25,7 @@
   </div>
 </template>
 <script>
-import { loadCoinlist } from './coinlistApi';
+import { loadCoinlist } from './api/coinlistApi';
 export default {
   name: 'CoinSuggestions',
   props: ['searchValue'],

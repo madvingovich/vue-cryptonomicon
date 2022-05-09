@@ -181,7 +181,7 @@
       <PriceBars
         v-if="selected"
         :title="`${selected.name} - USD`"
-        :prices="[]"
+        :prices="graph"
         @close="selected = null"
       />
     </div>
@@ -193,12 +193,8 @@ import AppTicker from './AppTicker.vue';
 import PriceBars from './PriceBars.vue';
 import CoinSuggestions from './CoinSuggestions.vue';
 import { nextTick } from '@vue/runtime-core';
-import {
-  subscribeToTicker,
-  unsubscribeFromTicker,
-  PRICE_UPDATE,
-  PRICE_ERROR,
-} from './api';
+import { subscribeToTicker, unsubscribeFromTicker } from './api/api';
+import { PRICE_UPDATE, PRICE_ERROR } from './api/constants';
 import { createStorageService } from './storageService';
 import { urlService } from './urlService';
 
@@ -217,6 +213,7 @@ export default {
       tickers: [],
       error: null,
       selected: null,
+      graph: [],
       interval: null,
     };
   },
@@ -256,7 +253,11 @@ export default {
       return this.tickers[index];
     },
     updateTickerPrice(name, price) {
-      this.getTickerByName(name).price = price;
+      const ticker = this.getTickerByName(name);
+      ticker.price = price;
+      if (ticker === this.selected) {
+        this.graph.push(price);
+      }
     },
     setTickerError(name, error) {
       this.getTickerByName(name).error = error;
@@ -270,6 +271,7 @@ export default {
     },
     onSelect(t) {
       this.selected = t;
+      this.graph = [];
     },
     onDelete(tickerToRemove) {
       this.tickers = this.tickers.filter((t) => t !== tickerToRemove);

@@ -5,9 +5,9 @@
     </h3>
     <div class="flex items-end border-gray-600 border-b border-l h-64">
       <div
-        v-for="(price, idx) in prices"
+        v-for="(price, idx) in lastPrices"
         :key="idx"
-        class="bg-purple-800 border w-10"
+        class="bg-purple-800 border w-5"
         v-bind:style="{ height: getPriceHeight(price) + '%' }"
       ></div>
     </div>
@@ -46,11 +46,15 @@ export default {
   props: ['title', 'prices'],
   emits: ['close'],
   methods: {
-    getPriceHeight() {
-      // const min = Math.min(...this.prices);
-      // const max = Math.max(...this.prices);
-      // return (5 + (price - min) * 95) / (max - min);
-      return 50;
+    getPriceHeight(price) {
+      const maxValue = Math.max(...this.lastPrices);
+      const minValue = Math.min(...this.lastPrices);
+      return ((price - minValue) / (maxValue - minValue)) * 95 + 5;
+    },
+  },
+  computed: {
+    lastPrices() {
+      return this.prices.slice(-50);
     },
   },
 };
