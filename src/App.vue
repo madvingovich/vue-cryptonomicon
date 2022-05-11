@@ -47,49 +47,13 @@
           @blur="clearError"
         />
         <div class="flex items-center">
-          <span>Фильтр:</span>
-          <input
-            type="text"
-            v-model="filter"
-            class="
-              mx-2
-              border-gray-300
-              text-gray-900
-              focus:outline-none focus:ring-gray-500 focus:border-gray-500
-              sm:text-sm
-              rounded-md
-            "
+          <app-filter v-model="filter" />
+          <app-pagination
+            :page="page"
+            @prevPage="page--"
+            @nextPage="page++"
+            :isNextPageAvailable="isNextPageAvailable"
           />
-          <hr />
-          <span class="mr-4">Страница:</span>
-          <span
-            v-if="page > 1"
-            @click="this.page--"
-            class="
-              cursor-pointer
-              p-1
-              bg-white
-              rounded-md
-              border-red-300 border-2
-            "
-            >&lt;</span
-          >
-
-          <span class="p-1 bg-white rounded-md mx-1 border-red-300 border-2">{{
-            page
-          }}</span>
-          <span
-            v-if="isNextPageAvailable"
-            @click="this.page++"
-            class="
-              cursor-pointer
-              p-1
-              bg-white
-              rounded-md
-              border-red-300 border-2
-            "
-            >&gt;</span
-          >
         </div>
       </section>
 
@@ -122,6 +86,8 @@
 <script>
 import AddTicker from './AddTicker.vue';
 import AppTicker from './AppTicker.vue';
+import AppFilter from './AppFilter.vue';
+import AppPagination from './AppPagination.vue';
 import PriceBars from './PriceBars.vue';
 import { nextTick } from '@vue/runtime-core';
 import { subscribeToTicker, unsubscribeFromTicker } from './api/api';
@@ -151,6 +117,8 @@ export default {
   components: {
     AddTicker,
     AppTicker,
+    AppFilter,
+    AppPagination,
     PriceBars,
   },
   mounted() {

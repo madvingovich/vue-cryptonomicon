@@ -64,6 +64,7 @@
 <script>
 import CoinSuggestions from './CoinSuggestions.vue';
 import AddIcon from './AddIcon.vue';
+import { nextTick } from '@vue/runtime-core';
 
 export default {
   props: {
@@ -86,6 +87,7 @@ export default {
   methods: {
     onSuggestionClick(ticker) {
       this.$emit('update:modelValue', ticker);
+      nextTick(this.addTicker());
     },
   },
 };
