@@ -1,5 +1,7 @@
 # cryptonom
 
+Vue app where user can add and watch changes in cryptocurrency prices with websockets.
+
 ## Project setup
 ```
 npm install
